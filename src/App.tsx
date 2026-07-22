@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { PRACTICE_EXAMPLES, type PracticeExample } from './lib/examples'
-import {
-  checkAreaWorking,
-  checkPointWorking,
-  summarizeChecks,
-  type CheckItem,
-} from './lib/enlargement'
 import { recognizeMathText } from './lib/ocr'
 import { parseWorkingText } from './lib/parseWorking'
+import {
+  checkDirectWorking,
+  checkInverseWorking,
+  checkJointWorking,
+  summarizeChecks,
+  type CheckItem,
+  type VariationKind,
+} from './lib/variation'
 
-type Mode = 'luas' | 'koordinat'
 type Num = number | ''
 
 function toNum(value: Num): number | undefined {
@@ -24,37 +25,41 @@ function statusLabel(status: CheckItem['status']): string {
   return 'Tiada'
 }
 
+const MODE_LABEL: Record<VariationKind, string> = {
+  langsung: 'Ubahan langsung',
+  songsang: 'Ubahan songsang',
+  bergabung: 'Ubahan bergabung',
+}
+
 export default function App() {
-  const [mode, setMode] = useState<Mode>('luas')
+  const [mode, setMode] = useState<VariationKind>('langsung')
   const [workingText, setWorkingText] = useState(
-    `Luas objek = 12
-k = 3
-k^2 = 9
-Luas imej = 108`,
+    `y = kx
+k = 5
+y = 5x
+bila x = 7
+jadi y = 35`,
   )
   const [ocrProgress, setOcrProgress] = useState(0)
   const [ocrBusy, setOcrBusy] = useState(false)
   const [ocrNotes, setOcrNotes] = useState<string[]>([])
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [activeExample, setActiveExample] = useState<string | null>('luas-1')
+  const [activeExample, setActiveExample] = useState<string | null>('langsung-1')
 
-  // Soalan / jawapan jangkaan
-  const [objectArea, setObjectArea] = useState<Num>(12)
-  const [imageArea, setImageArea] = useState<Num>(108)
-  const [ox, setOx] = useState<Num>(2)
-  const [oy, setOy] = useState<Num>(3)
-  const [ix, setIx] = useState<Num>(4)
-  const [iy, setIy] = useState<Num>(6)
-  const [cx, setCx] = useState<Num>(0)
-  const [cy, setCy] = useState<Num>(0)
+  // Data soalan
+  const [x, setX] = useState<Num>(4)
+  const [y, setY] = useState<Num>(20)
+  const [z, setZ] = useState<Num>(3)
+  const [w, setW] = useState<Num>(1)
+  const [x2, setX2] = useState<Num>(7)
+  const [y2Expected, setY2Expected] = useState<Num>(35)
+  const [z2, setZ2] = useState<Num>(5)
+  const [w2, setW2] = useState<Num>(1)
 
-  // Nilai daripada jalan kerja pelajar (boleh diedit selepas OCR)
-  const [studentK, setStudentK] = useState<Num>(3)
-  const [studentK2, setStudentK2] = useState<Num>(9)
-  const [studentObjectArea, setStudentObjectArea] = useState<Num>(12)
-  const [studentImageArea, setStudentImageArea] = useState<Num>(108)
-  const [studentIx, setStudentIx] = useState<Num>('')
-  const [studentIy, setStudentIy] = useState<Num>('')
+  // Bacaan pelajar
+  const [studentEquation, setStudentEquation] = useState('y = kx')
+  const [studentK, setStudentK] = useState<Num>(5)
+  const [studentY2, setStudentY2] = useState<Num>(35)
 
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
@@ -65,42 +70,54 @@ Luas imej = 108`,
   }, [previewUrl])
 
   const checks = useMemo(() => {
-    if (mode === 'luas') {
-      return checkAreaWorking({
-        objectArea: toNum(objectArea) ?? 0,
-        imageArea: toNum(imageArea) ?? 0,
-        studentScaleFactor: toNum(studentK),
-        studentAreaScaleFactor: toNum(studentK2),
-        studentObjectArea: toNum(studentObjectArea),
-        studentImageArea: toNum(studentImageArea),
+    if (mode === 'langsung') {
+      return checkDirectWorking({
+        x: toNum(x) ?? 0,
+        y: toNum(y) ?? 0,
+        x2: toNum(x2),
+        y2Expected: toNum(y2Expected),
+        studentK: toNum(studentK),
+        studentEquation,
+        studentY2: toNum(studentY2),
       })
     }
-    return checkPointWorking({
-      object: { x: toNum(ox) ?? 0, y: toNum(oy) ?? 0 },
-      image: { x: toNum(ix) ?? 0, y: toNum(iy) ?? 0 },
-      center: { x: toNum(cx) ?? 0, y: toNum(cy) ?? 0 },
-      studentScaleFactor: toNum(studentK),
-      studentImage:
-        toNum(studentIx) == null || toNum(studentIy) == null
-          ? undefined
-          : { x: toNum(studentIx)!, y: toNum(studentIy)! },
+    if (mode === 'songsang') {
+      return checkInverseWorking({
+        x: toNum(x) ?? 0,
+        y: toNum(y) ?? 0,
+        x2: toNum(x2),
+        y2Expected: toNum(y2Expected),
+        studentK: toNum(studentK),
+        studentEquation,
+        studentY2: toNum(studentY2),
+      })
+    }
+    return checkJointWorking({
+      x: toNum(x) ?? 0,
+      z: toNum(z) ?? 1,
+      y: toNum(y) ?? 0,
+      w: toNum(w) ?? 1,
+      x2: toNum(x2),
+      z2: toNum(z2),
+      w2: toNum(w2),
+      y2Expected: toNum(y2Expected),
+      studentK: toNum(studentK),
+      studentEquation,
+      studentY2: toNum(studentY2),
     })
   }, [
     mode,
-    objectArea,
-    imageArea,
+    x,
+    y,
+    z,
+    w,
+    x2,
+    y2Expected,
+    z2,
+    w2,
     studentK,
-    studentK2,
-    studentObjectArea,
-    studentImageArea,
-    ox,
-    oy,
-    ix,
-    iy,
-    cx,
-    cy,
-    studentIx,
-    studentIy,
+    studentEquation,
+    studentY2,
   ])
 
   const summary = useMemo(() => summarizeChecks(checks), [checks])
@@ -109,15 +126,15 @@ Luas imej = 108`,
     setWorkingText(text)
     const parsed = parseWorkingText(text)
     setOcrNotes(parsed.notes)
-    if (parsed.scaleFactor != null) setStudentK(parsed.scaleFactor)
-    if (parsed.areaScaleFactor != null) setStudentK2(parsed.areaScaleFactor)
-    if (parsed.objectArea != null) setStudentObjectArea(parsed.objectArea)
-    if (parsed.imageArea != null) setStudentImageArea(parsed.imageArea)
-    if (parsed.imagePoint) {
-      setStudentIx(parsed.imagePoint.x)
-      setStudentIy(parsed.imagePoint.y)
-      setMode('koordinat')
-    }
+    if (parsed.kind) setMode(parsed.kind)
+    if (parsed.equation) setStudentEquation(parsed.equation)
+    if (parsed.k != null) setStudentK(parsed.k)
+    if (parsed.y2 != null) setStudentY2(parsed.y2)
+    if (parsed.x != null) setX(parsed.x)
+    if (parsed.y != null) setY(parsed.y)
+    if (parsed.z != null) setZ(parsed.z)
+    if (parsed.w != null) setW(parsed.w)
+    if (parsed.x2 != null) setX2(parsed.x2)
   }
 
   async function handleFile(file: File | undefined) {
@@ -141,23 +158,62 @@ Luas imej = 108`,
 
   function loadExample(example: PracticeExample, kind: 'betul' | 'salah') {
     setActiveExample(example.id)
-    setMode(example.topic === 'luas' ? 'luas' : 'koordinat')
-    if (example.objectArea != null) setObjectArea(example.objectArea)
-    if (example.imageArea != null) setImageArea(example.imageArea)
-    if (example.object) {
-      setOx(example.object.x)
-      setOy(example.object.y)
-    }
-    if (example.image) {
-      setIx(example.image.x)
-      setIy(example.image.y)
-    }
-    if (example.center) {
-      setCx(example.center.x)
-      setCy(example.center.y)
-    }
+    setMode(example.topic)
+    setX(example.x)
+    setY(example.y)
+    setZ(example.z ?? 1)
+    setW(example.w ?? 1)
+    setX2(example.x2 ?? '')
+    setY2Expected(example.y2 ?? '')
+    setZ2(example.z2 ?? '')
+    setW2(example.w2 ?? example.w ?? 1)
     const text = kind === 'betul' ? example.sampleWorking : example.commonMistake
     applyParsedText(text)
+  }
+
+  function setModeDefaults(next: VariationKind) {
+    setMode(next)
+    if (next === 'langsung') {
+      setX(4)
+      setY(20)
+      setX2(7)
+      setY2Expected(35)
+      setStudentEquation('y = kx')
+      setStudentK(5)
+      setStudentY2(35)
+      setWorkingText(`y = kx
+k = 5
+bila x = 7
+jadi y = 35`)
+    } else if (next === 'songsang') {
+      setX(4)
+      setY(6)
+      setX2(8)
+      setY2Expected(3)
+      setStudentEquation('y = k/x')
+      setStudentK(24)
+      setStudentY2(3)
+      setWorkingText(`y = k/x
+k = 24
+bila x = 8
+jadi y = 3`)
+    } else {
+      setX(2)
+      setY(30)
+      setZ(3)
+      setW(1)
+      setX2(4)
+      setZ2(5)
+      setW2(1)
+      setY2Expected(100)
+      setStudentEquation('y = kxz')
+      setStudentK(5)
+      setStudentY2(100)
+      setWorkingText(`y = kxz
+k = 5
+bila x = 4, z = 5
+jadi y = 100`)
+    }
   }
 
   return (
@@ -165,7 +221,7 @@ Luas imej = 108`,
       <header className="nav">
         <div className="brand">
           MathKVSA
-          <span>Scanner Pembesaran</span>
+          <span>Scanner Ubahan</span>
         </div>
         <nav className="nav-links" aria-label="Navigasi utama">
           <a href="#scanner">Scanner</a>
@@ -180,8 +236,8 @@ Luas imej = 108`,
         <div className="hero-inner">
           <h1>MathKVSA</h1>
           <p>
-            Imbas jalan kerja pelajar untuk semak faktor skala dan luas transformasi
-            pembesaran — cepat, jelas, dan fokusulasikan.
+            Imbas jalan kerja pelajar untuk semak ubahan langsung, songsang, dan
+            bergabung — pemalar k, persamaan, dan nilai baharu.
           </p>
           <div className="hero-actions">
             <a className="btn btn-primary" href="#scanner">
@@ -198,27 +254,23 @@ Luas imej = 108`,
         <div className="section-head">
           <h2>Scanner jalan kerja</h2>
           <p>
-            Muat naik gambar atau gunakan kamera. OCR akan cuba baca nilai k, k², dan
-            luas. Anda boleh betulkan bacaan sebelum semakan.
+            Muat naik gambar atau taip jalan kerja. Sistem semak bentuk persamaan,
+            nilai k, dan jawapan y mengikut jenis ubahan.
           </p>
         </div>
 
         <div className="panel">
-          <div className="tabs" role="tablist" aria-label="Jenis soalan">
-            <button
-              type="button"
-              className={`tab ${mode === 'luas' ? 'active' : ''}`}
-              onClick={() => setMode('luas')}
-            >
-              Luas & faktor skala
-            </button>
-            <button
-              type="button"
-              className={`tab ${mode === 'koordinat' ? 'active' : ''}`}
-              onClick={() => setMode('koordinat')}
-            >
-              Koordinat pembesaran
-            </button>
+          <div className="tabs" role="tablist" aria-label="Jenis ubahan">
+            {(Object.keys(MODE_LABEL) as VariationKind[]).map((key) => (
+              <button
+                key={key}
+                type="button"
+                className={`tab ${mode === key ? 'active' : ''}`}
+                onClick={() => setModeDefaults(key)}
+              >
+                {MODE_LABEL[key]}
+              </button>
+            ))}
           </div>
 
           <div className="grid-2">
@@ -286,7 +338,10 @@ Luas imej = 108`,
                   id="working"
                   value={workingText}
                   onChange={(e) => setWorkingText(e.target.value)}
-                  placeholder="Contoh: Luas objek = 12&#10;k = 3&#10;k^2 = 9&#10;Luas imej = 108"
+                  placeholder={`Contoh:
+y = kx
+k = 5
+jadi y = 35`}
                 />
               </div>
             </div>
@@ -295,200 +350,145 @@ Luas imej = 108`,
               <div className="verdict">
                 <strong>{summary.verdict}</strong>
                 {summary.total > 0
-                  ? `${summary.score}/${summary.total} semakan lulus`
-                  : 'Isi nilai soalan dan jalan kerja untuk mula'}
+                  ? `${summary.score}/${summary.total} semakan lulus · ${MODE_LABEL[mode]}`
+                  : `Isi data soalan dan jalan kerja · ${MODE_LABEL[mode]}`}
               </div>
 
-              {mode === 'luas' ? (
-                <>
-                  <h3 style={{ marginTop: 0, color: 'var(--teal)' }}>Data soalan</h3>
-                  <div className="row-3">
+              <h3 style={{ marginTop: 0, color: 'var(--teal)' }}>Data soalan</h3>
+              <div className="row-3">
+                <div className="field">
+                  <label htmlFor="x">x</label>
+                  <input
+                    id="x"
+                    type="number"
+                    value={x}
+                    onChange={(e) => setX(e.target.value === '' ? '' : Number(e.target.value))}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="y">y</label>
+                  <input
+                    id="y"
+                    type="number"
+                    value={y}
+                    onChange={(e) => setY(e.target.value === '' ? '' : Number(e.target.value))}
+                  />
+                </div>
+                {mode === 'bergabung' && (
+                  <>
                     <div className="field">
-                      <label htmlFor="obj-area">Luas objek</label>
+                      <label htmlFor="z">z</label>
                       <input
-                        id="obj-area"
+                        id="z"
                         type="number"
-                        value={objectArea}
+                        value={z}
                         onChange={(e) =>
-                          setObjectArea(e.target.value === '' ? '' : Number(e.target.value))
+                          setZ(e.target.value === '' ? '' : Number(e.target.value))
                         }
                       />
                     </div>
                     <div className="field">
-                      <label htmlFor="img-area">Luas imej (jawapan)</label>
+                      <label htmlFor="w">w (1 jika tiada)</label>
                       <input
-                        id="img-area"
+                        id="w"
                         type="number"
-                        value={imageArea}
+                        value={w}
                         onChange={(e) =>
-                          setImageArea(e.target.value === '' ? '' : Number(e.target.value))
+                          setW(e.target.value === '' ? '' : Number(e.target.value))
                         }
                       />
                     </div>
-                  </div>
+                  </>
+                )}
+                <div className="field">
+                  <label htmlFor="x2">x baharu</label>
+                  <input
+                    id="x2"
+                    type="number"
+                    value={x2}
+                    onChange={(e) => setX2(e.target.value === '' ? '' : Number(e.target.value))}
+                  />
+                </div>
+                {mode === 'bergabung' && (
+                  <>
+                    <div className="field">
+                      <label htmlFor="z2">z baharu</label>
+                      <input
+                        id="z2"
+                        type="number"
+                        value={z2}
+                        onChange={(e) =>
+                          setZ2(e.target.value === '' ? '' : Number(e.target.value))
+                        }
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor="w2">w baharu</label>
+                      <input
+                        id="w2"
+                        type="number"
+                        value={w2}
+                        onChange={(e) =>
+                          setW2(e.target.value === '' ? '' : Number(e.target.value))
+                        }
+                      />
+                    </div>
+                  </>
+                )}
+                <div className="field">
+                  <label htmlFor="y2e">y jawapan (jika ada)</label>
+                  <input
+                    id="y2e"
+                    type="number"
+                    value={y2Expected}
+                    onChange={(e) =>
+                      setY2Expected(e.target.value === '' ? '' : Number(e.target.value))
+                    }
+                  />
+                </div>
+              </div>
 
-                  <h3 style={{ color: 'var(--teal)' }}>Bacaan daripada pelajar</h3>
-                  <div className="row-3">
-                    <div className="field">
-                      <label htmlFor="sk">k</label>
-                      <input
-                        id="sk"
-                        type="number"
-                        value={studentK}
-                        onChange={(e) =>
-                          setStudentK(e.target.value === '' ? '' : Number(e.target.value))
-                        }
-                      />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="sk2">k²</label>
-                      <input
-                        id="sk2"
-                        type="number"
-                        value={studentK2}
-                        onChange={(e) =>
-                          setStudentK2(e.target.value === '' ? '' : Number(e.target.value))
-                        }
-                      />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="soa">Luas objek (pelajar)</label>
-                      <input
-                        id="soa"
-                        type="number"
-                        value={studentObjectArea}
-                        onChange={(e) =>
-                          setStudentObjectArea(
-                            e.target.value === '' ? '' : Number(e.target.value),
-                          )
-                        }
-                      />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="sia">Luas imej (pelajar)</label>
-                      <input
-                        id="sia"
-                        type="number"
-                        value={studentImageArea}
-                        onChange={(e) =>
-                          setStudentImageArea(
-                            e.target.value === '' ? '' : Number(e.target.value),
-                          )
-                        }
-                      />
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <h3 style={{ marginTop: 0, color: 'var(--teal)' }}>Data soalan</h3>
-                  <div className="row-3">
-                    <div className="field">
-                      <label htmlFor="ox">Objek x</label>
-                      <input
-                        id="ox"
-                        type="number"
-                        value={ox}
-                        onChange={(e) =>
-                          setOx(e.target.value === '' ? '' : Number(e.target.value))
-                        }
-                      />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="oy">Objek y</label>
-                      <input
-                        id="oy"
-                        type="number"
-                        value={oy}
-                        onChange={(e) =>
-                          setOy(e.target.value === '' ? '' : Number(e.target.value))
-                        }
-                      />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="cx">Pusat x</label>
-                      <input
-                        id="cx"
-                        type="number"
-                        value={cx}
-                        onChange={(e) =>
-                          setCx(e.target.value === '' ? '' : Number(e.target.value))
-                        }
-                      />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="cy">Pusat y</label>
-                      <input
-                        id="cy"
-                        type="number"
-                        value={cy}
-                        onChange={(e) =>
-                          setCy(e.target.value === '' ? '' : Number(e.target.value))
-                        }
-                      />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="ix">Imej x (jawapan)</label>
-                      <input
-                        id="ix"
-                        type="number"
-                        value={ix}
-                        onChange={(e) =>
-                          setIx(e.target.value === '' ? '' : Number(e.target.value))
-                        }
-                      />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="iy">Imej y (jawapan)</label>
-                      <input
-                        id="iy"
-                        type="number"
-                        value={iy}
-                        onChange={(e) =>
-                          setIy(e.target.value === '' ? '' : Number(e.target.value))
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <h3 style={{ color: 'var(--teal)' }}>Bacaan daripada pelajar</h3>
-                  <div className="row-3">
-                    <div className="field">
-                      <label htmlFor="pk">k</label>
-                      <input
-                        id="pk"
-                        type="number"
-                        value={studentK}
-                        onChange={(e) =>
-                          setStudentK(e.target.value === '' ? '' : Number(e.target.value))
-                        }
-                      />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="pix">Imej x (pelajar)</label>
-                      <input
-                        id="pix"
-                        type="number"
-                        value={studentIx}
-                        onChange={(e) =>
-                          setStudentIx(e.target.value === '' ? '' : Number(e.target.value))
-                        }
-                      />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="piy">Imej y (pelajar)</label>
-                      <input
-                        id="piy"
-                        type="number"
-                        value={studentIy}
-                        onChange={(e) =>
-                          setStudentIy(e.target.value === '' ? '' : Number(e.target.value))
-                        }
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
+              <h3 style={{ color: 'var(--teal)' }}>Bacaan daripada pelajar</h3>
+              <div className="row-3">
+                <div className="field" style={{ gridColumn: '1 / -1' }}>
+                  <label htmlFor="eq">Persamaan</label>
+                  <input
+                    id="eq"
+                    type="text"
+                    value={studentEquation}
+                    onChange={(e) => setStudentEquation(e.target.value)}
+                    placeholder={
+                      mode === 'langsung'
+                        ? 'y = kx'
+                        : mode === 'songsang'
+                          ? 'y = k/x'
+                          : 'y = kxz / w'
+                    }
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="sk">k</label>
+                  <input
+                    id="sk"
+                    type="number"
+                    value={studentK}
+                    onChange={(e) =>
+                      setStudentK(e.target.value === '' ? '' : Number(e.target.value))
+                    }
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="sy2">y baharu (pelajar)</label>
+                  <input
+                    id="sy2"
+                    type="number"
+                    value={studentY2}
+                    onChange={(e) =>
+                      setStudentY2(e.target.value === '' ? '' : Number(e.target.value))
+                    }
+                  />
+                </div>
+              </div>
 
               <div className="checks" style={{ marginTop: '1rem' }}>
                 {checks.map((item) => (
@@ -511,16 +511,16 @@ Luas imej = 108`,
 
           <div className="formula-strip">
             <div className="formula">
-              <strong>k</strong>
-              Faktor skala linear: jarak imej ÷ jarak objek dari pusat.
+              <strong>Langsung</strong>
+              y ∝ x → y = kx → k = y / x
             </div>
             <div className="formula">
-              <strong>k²</strong>
-              Faktor skala luas = k² = luas imej ÷ luas objek.
+              <strong>Songsang</strong>
+              y ∝ 1/x → y = k/x → k = xy
             </div>
             <div className="formula">
-              <strong>Imej</strong>
-              I = C + k(O − C) untuk setiap koordinat.
+              <strong>Bergabung</strong>
+              y ∝ xz/w → y = kxz/w → k = yw/(xz)
             </div>
           </div>
         </div>
@@ -530,14 +530,17 @@ Luas imej = 108`,
         <div className="section-head">
           <h2>Contoh untuk cuba</h2>
           <p>
-            Pilih soalan, kemudian muat jalan kerja betul atau kesilapan biasa supaya
-            anda nampak bagaimana scanner menanda langkah.
+            Muat jawapan betul atau kesilapan biasa (contoh: campur formula langsung
+            dengan songsang) untuk lihat bagaimana scanner menanda langkah.
           </p>
         </div>
 
         <div className="examples">
           {PRACTICE_EXAMPLES.map((example) => (
-            <div key={example.id} className={`example ${activeExample === example.id ? 'active' : ''}`}>
+            <div
+              key={example.id}
+              className={`example ${activeExample === example.id ? 'active' : ''}`}
+            >
               <h3>{example.title}</h3>
               <p>{example.prompt}</p>
               <div className="actions">
@@ -562,7 +565,7 @@ Luas imej = 108`,
       </section>
 
       <footer className="footer">
-        MathKVSA · Fokus topik ubahan pembesaran & luas · Dibina untuk semakan bilik darjah
+        MathKVSA · Fokus ubahan langsung, songsang & bergabung · Semakan bilik darjah
       </footer>
     </div>
   )

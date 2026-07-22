@@ -1,39 +1,35 @@
-# MathKVSA — Scanner Pembesaran
+# MathKVSA — Scanner Ubahan
 
-Aplikasi web untuk **semakan jalan kerja matematik** pelajar bagi topik **ubahan transformasi pembesaran** dan **luas**.
+Aplikasi web untuk **semakan jalan kerja matematik** pelajar bagi tajuk **ubahan**:
 
-## Apa yang boleh dibuat
+- **Ubahan langsung** — \(y \propto x\), \(y = kx\)
+- **Ubahan songsang** — \(y \propto 1/x\), \(y = k/x\)
+- **Ubahan bergabung** — \(y \propto xz\) atau \(y \propto xz/w\)
 
-- Imbas / muat naik gambar jalan kerja (OCR dengan Tesseract.js)
-- Semak faktor skala linear **k** dan faktor skala luas **k²**
-- Semak hubungan `luas imej = k² × luas objek`
-- Semak koordinat imej selepas pembesaran dari suatu pusat
-- Cuba contoh jawapan betul vs kesilapan biasa (contoh: guna **k** bukan **k²** untuk luas)
+## Ciri
 
-## Jalankan secara tempatan
+- Imbas / muat naik gambar jalan kerja (OCR) atau taip manual
+- Semak bentuk persamaan, pemalar **k**, dan nilai **y** baharu
+- Tip untuk kesilapan biasa (contoh: guna formula songsang untuk langsung)
+- Contoh soalan siap cuba
+
+## Jalankan
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Skrip lain
-
 ```bash
-npm test      # ujian enjin semakan
-npm run build # bina produksi
-npm run lint  # oxlint
+npm test
+npm run build
 ```
 
-## Nota OCR
-
-OCR paling berkesan jika tulisan jelas, kontras tinggi, dan nilai ditulis dalam bentuk seperti:
+## Format jalan kerja yang mesra OCR
 
 ```text
-Luas objek = 12
-k = 3
-k^2 = 9
-Luas imej = 108
+y = kx
+k = 5
+bila x = 7
+jadi y = 35
 ```
-
-Anda sentiasa boleh betulkan bacaan OCR secara manual sebelum semakan.
