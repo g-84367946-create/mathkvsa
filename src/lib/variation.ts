@@ -11,43 +11,46 @@ export type CheckItem = {
 
 export type VariationKind = 'langsung' | 'songsang' | 'bergabung'
 
-export type DirectInput = {
-  x: number
-  y: number
-  /** Nilai y yang diminta pada x baharu (opsyenal). */
-  x2?: number
-  y2Expected?: number
-  studentK?: number
-  studentEquation?: string
-  studentY2?: number
+/** Kuasa pada pemboleh ubah songsang: 1 = 1/x, 0.5 = 1/√x, 2 = 1/x² */
+export type InversePower = 1 | 0.5 | 2
+
+export type PaperProblem = {
+  kind: VariationKind
+  /** Label paparan, contoh: y, G, E */
+  dependent: string
+  /** Pemboleh ubah utama (langsung/songsang) atau pembilang pertama (bergabung) */
+  independent: string
+  /** Untuk bergabung: pembilang kedua (contoh z). Kosong jika tiada. */
+  jointNumerator2?: string
+  /** Untuk bergabung: penyebut (contoh g / w). */
+  jointDenominator?: string
+  /** Untuk songsang: kuasa pada independent. */
+  inversePower?: InversePower
+  /** Pasangan nilai diberi untuk cari k */
+  given: Record<string, number>
+  /** Nilai baharu untuk ganti (jika soalan minta nilai) */
+  ask?: Record<string, number>
+  /** Pemboleh ubah yang perlu dicari (jika ada) */
+  findVar?: string
+  /** Jawapan akhir dijangka */
+  expectedAnswer?: number
+  /** Bentuk ∝ dijangka, contoh: "y ∝ x", "G ∝ 1/√h", "E ∝ f/g" */
+  expectedProportion: string
 }
 
-export type InverseInput = {
-  x: number
-  y: number
-  x2?: number
-  y2Expected?: number
-  studentK?: number
-  studentEquation?: string
-  studentY2?: number
+export type StudentPaperWorking = {
+  raw: string
+  hasProportion?: boolean
+  proportionText?: string
+  hasEquationWithK?: boolean
+  equationWithK?: string
+  k?: number
+  finalEquation?: string
+  answer?: number
+  substitutions: string[]
 }
 
-export type JointInput = {
-  /** y ∝ x * z / w  (w boleh 1 jika tiada pembahagi). */
-  x: number
-  z: number
-  y: number
-  w?: number
-  x2?: number
-  z2?: number
-  w2?: number
-  y2Expected?: number
-  studentK?: number
-  studentEquation?: string
-  studentY2?: number
-}
-
-export function nearlyEqual(a: number, b: number, tol = 1e-6): boolean {
+export function nearlyEqual(a: number, b: number, tol = 1e-4): boolean {
   return Math.abs(a - b) <= tol + Math.abs(b) * 1e-9
 }
 
@@ -57,292 +60,343 @@ export function formatNumber(n: number): string {
   return Number.isInteger(rounded) ? String(rounded) : String(rounded)
 }
 
-/** Ubahan langsung: y ∝ x ⇒ k = y / x */
-export function directConstant(x: number, y: number): number | null {
-  if (x === 0) return null
-  return y / x
-}
-
-export function directY(k: number, x: number): number {
-  return k * x
-}
-
-/** Ubahan songsang: y ∝ 1/x ⇒ k = x * y */
-export function inverseConstant(x: number, y: number): number | null {
-  return x * y
-}
-
-export function inverseY(k: number, x: number): number | null {
-  if (x === 0) return null
-  return k / x
-}
-
-/** Ubahan bergabung: y ∝ xz/w ⇒ k = y * w / (x * z) */
-export function jointConstant(x: number, z: number, y: number, w = 1): number | null {
-  if (x === 0 || z === 0) return null
-  return (y * w) / (x * z)
-}
-
-export function jointY(k: number, x: number, z: number, w = 1): number | null {
-  if (w === 0) return null
-  return (k * x * z) / w
-}
-
-function normalizeEquation(raw: string): string {
+export function normalizeMath(raw: string): string {
   return raw
     .toLowerCase()
-    .replace(/\s+/g, '')
+    .replace(/√\s*/g, 'sqrt')
+    .replace(/punca\s*kuasa\s*dua/g, 'sqrt')
+    .replace(/propto|berkadar|berubah\s*secara/g, 'propto')
+    .replace(/∝/g, 'propto')
     .replace(/×/g, '*')
     .replace(/÷/g, '/')
-    .replace(/∝/g, 'propto')
+    .replace(/\s+/g, '')
 }
 
-export function matchesDirectEquation(eq: string): boolean {
-  const n = normalizeEquation(eq)
-  return (
-    /^y=k[*]?x$/.test(n) ||
-    /^y=kx$/.test(n) ||
-    /^ypropto x$/.test(n) ||
-    /^y∝x$/.test(normalizeEquation(eq).replace('propto', '∝'))
-  )
+function powerLabel(power: InversePower, variable: string): string {
+  if (power === 0.5) return `√${variable}`
+  if (power === 2) return `${variable}²`
+  return variable
 }
 
-export function matchesInverseEquation(eq: string): boolean {
-  const n = normalizeEquation(eq)
-  return (
-    /^y=k\/x$/.test(n) ||
-    /^y=k\*1\/x$/.test(n) ||
-    /^ypropto1\/x$/.test(n) ||
-    /^xy=k$/.test(n)
-  )
+export function expectedProportionText(problem: PaperProblem): string {
+  return problem.expectedProportion
 }
 
-export function matchesJointEquation(eq: string, hasW: boolean): boolean {
-  const n = normalizeEquation(eq)
-  if (hasW) {
+export function computeK(problem: PaperProblem): number | null {
+  const dep = problem.given[problem.dependent]
+  if (dep == null) return null
+
+  if (problem.kind === 'langsung') {
+    const x = problem.given[problem.independent]
+    if (x == null || x === 0) return null
+    return dep / x
+  }
+
+  if (problem.kind === 'songsang') {
+    const x = problem.given[problem.independent]
+    if (x == null) return null
+    const power = problem.inversePower ?? 1
+    const base = power === 0.5 ? Math.sqrt(x) : power === 2 ? x * x : x
+    if (base === 0) return null
+    return dep * base
+  }
+
+  // bergabung: dep ∝ n1 * n2 / d  (n2 dan d opsyenal)
+  const n1 = problem.given[problem.independent]
+  if (n1 == null || n1 === 0) return null
+  const n2Name = problem.jointNumerator2
+  const dName = problem.jointDenominator
+  const n2 = n2Name ? problem.given[n2Name] : 1
+  const d = dName ? problem.given[dName] : 1
+  if (n2 == null || d == null || n2 === 0) return null
+  return (dep * d) / (n1 * n2)
+}
+
+export function evaluateAsked(problem: PaperProblem, k: number): number | null {
+  if (!problem.ask && problem.findVar == null) return null
+
+  if (problem.kind === 'langsung') {
+    const find = problem.findVar ?? problem.dependent
+    if (find === problem.dependent) {
+      const x = problem.ask?.[problem.independent]
+      if (x == null) return null
+      return k * x
+    }
+    // cari independent: y = kx ⇒ x = y/k
+    const yVal = problem.ask?.[problem.dependent]
+    if (yVal == null || k === 0) return null
+    return yVal / k
+  }
+
+  if (problem.kind === 'songsang') {
+    const x = problem.ask?.[problem.independent]
+    if (x == null) return null
+    const power = problem.inversePower ?? 1
+    const base = power === 0.5 ? Math.sqrt(x) : power === 2 ? x * x : x
+    if (base === 0) return null
+    return k / base
+  }
+
+  // bergabung
+  const n1 = problem.ask?.[problem.independent]
+  if (n1 == null) return null
+  const n2Name = problem.jointNumerator2
+  const dName = problem.jointDenominator
+  const n2 = n2Name ? problem.ask?.[n2Name] ?? 1 : 1
+  const d = dName ? problem.ask?.[dName] ?? 1 : 1
+  if (d === 0) return null
+  return (k * n1 * n2) / d
+}
+
+function proportionLooksCorrect(student: string, problem: PaperProblem): boolean {
+  const s = normalizeMath(student)
+  const dep = problem.dependent.toLowerCase()
+  const ind = problem.independent.toLowerCase()
+
+  if (problem.kind === 'langsung') {
     return (
-      /^y=k[*]?x[*]?z\/w$/.test(n) ||
-      /^y=kx z\/w$/.test(n.replace(/\s/g, '')) ||
-      /^y=kxz\/w$/.test(n) ||
-      /^yproptoxz\/w$/.test(n) ||
-      /^yw=kxz$/.test(n)
+      s.includes(`${dep}propto${ind}`) ||
+      s.includes(`${dep}=k${ind}`) ||
+      s.includes(`${dep}=k*${ind}`)
     )
   }
-  return (
-    /^y=k[*]?x[*]?z$/.test(n) ||
-    /^y=kxz$/.test(n) ||
-    /^yproptoxz$/.test(n) ||
-    /^y=k[*]?x[*]?z$/.test(n)
-  )
-}
 
-export function checkDirectWorking(input: DirectInput): CheckItem[] {
-  const { x, y, x2, y2Expected, studentK, studentEquation, studentY2 } = input
-  const expectedK = directConstant(x, y)
-  const items: CheckItem[] = []
-
-  if (studentEquation != null && studentEquation.trim() !== '') {
-    const ok = matchesDirectEquation(studentEquation)
-    const looksInverse = matchesInverseEquation(studentEquation)
-    items.push({
-      id: 'eq-langsung',
-      label: 'Bentuk persamaan ubahan langsung',
-      status: ok ? 'betul' : 'salah',
-      expected: 'y = kx  atau  y ∝ x',
-      found: studentEquation.trim(),
-      tip: ok
-        ? undefined
-        : looksInverse
-          ? 'Ini nampak seperti ubahan songsang. Untuk langsung guna y = kx.'
-          : 'Tulis y = kx (atau y ∝ x) untuk ubahan langsung.',
-    })
-  }
-
-  if (studentK != null && expectedK != null) {
-    const usedInverse = nearlyEqual(studentK, x * y)
-    const ok = nearlyEqual(studentK, expectedK)
-    items.push({
-      id: 'k-langsung',
-      label: 'Pemalar ubahan, k',
-      status: ok ? 'betul' : 'salah',
-      expected: formatNumber(expectedK),
-      found: formatNumber(studentK),
-      tip: ok
-        ? undefined
-        : usedInverse
-          ? 'Kesilapan biasa: k = xy ialah untuk songsang. Untuk langsung, k = y ÷ x.'
-          : 'Untuk ubahan langsung, k = y / x.',
-    })
-  }
-
-  if (studentY2 != null && x2 != null && expectedK != null) {
-    const expected = y2Expected ?? directY(expectedK, x2)
-    const ok = nearlyEqual(studentY2, expected)
-    items.push({
-      id: 'y2-langsung',
-      label: 'Nilai baharu y',
-      status: ok ? 'betul' : 'salah',
-      expected: formatNumber(expected),
-      found: formatNumber(studentY2),
-      tip: ok ? undefined : 'Guna y = kx dengan nilai x baharu selepas k dijumpai.',
-    })
-  }
-
-  if (items.length === 0) {
-    items.push({
-      id: 'empty-langsung',
-      label: 'Tiada langkah dijumpai untuk disemak',
-      status: 'tiada',
-      tip: 'Masukkan persamaan, nilai k, atau y baharu daripada jalan kerja.',
-    })
-  }
-
-  return items
-}
-
-export function checkInverseWorking(input: InverseInput): CheckItem[] {
-  const { x, y, x2, y2Expected, studentK, studentEquation, studentY2 } = input
-  const expectedK = inverseConstant(x, y)
-  const items: CheckItem[] = []
-
-  if (studentEquation != null && studentEquation.trim() !== '') {
-    const ok = matchesInverseEquation(studentEquation)
-    const looksDirect = matchesDirectEquation(studentEquation)
-    items.push({
-      id: 'eq-songsang',
-      label: 'Bentuk persamaan ubahan songsang',
-      status: ok ? 'betul' : 'salah',
-      expected: 'y = k/x  atau  xy = k',
-      found: studentEquation.trim(),
-      tip: ok
-        ? undefined
-        : looksDirect
-          ? 'Ini nampak seperti ubahan langsung. Untuk songsang guna y = k/x.'
-          : 'Tulis y = k/x (atau xy = k) untuk ubahan songsang.',
-    })
-  }
-
-  if (studentK != null && expectedK != null) {
-    const usedDirect = x !== 0 && nearlyEqual(studentK, y / x)
-    const ok = nearlyEqual(studentK, expectedK)
-    items.push({
-      id: 'k-songsang',
-      label: 'Pemalar ubahan, k',
-      status: ok ? 'betul' : 'salah',
-      expected: formatNumber(expectedK),
-      found: formatNumber(studentK),
-      tip: ok
-        ? undefined
-        : usedDirect
-          ? 'Kesilapan biasa: k = y/x ialah untuk langsung. Untuk songsang, k = x × y.'
-          : 'Untuk ubahan songsang, k = x × y.',
-    })
-  }
-
-  if (studentY2 != null && x2 != null && expectedK != null) {
-    const expected = y2Expected ?? inverseY(expectedK, x2)
-    if (expected != null) {
-      const ok = nearlyEqual(studentY2, expected)
-      items.push({
-        id: 'y2-songsang',
-        label: 'Nilai baharu y',
-        status: ok ? 'betul' : 'salah',
-        expected: formatNumber(expected),
-        found: formatNumber(studentY2),
-        tip: ok ? undefined : 'Guna y = k/x dengan nilai x baharu selepas k dijumpai.',
-      })
+  if (problem.kind === 'songsang') {
+    const power = problem.inversePower ?? 1
+    if (power === 0.5) {
+      return (
+        s.includes(`${dep}propto1/sqrt${ind}`) ||
+        s.includes(`${dep}=k/sqrt${ind}`) ||
+        s.includes(`${dep}propto1/√${ind}`)
+      )
     }
+    if (power === 2) {
+      return (
+        s.includes(`${dep}propto1/${ind}^2`) ||
+        s.includes(`${dep}propto1/${ind}2`) ||
+        s.includes(`${dep}=k/${ind}^2`) ||
+        s.includes(`${dep}=k/${ind}²`)
+      )
+    }
+    return (
+      s.includes(`${dep}propto1/${ind}`) ||
+      s.includes(`${dep}=k/${ind}`) ||
+      s.includes(`${ind}${dep}=k`) ||
+      s.includes(`${dep}${ind}=k`)
+    )
   }
 
-  if (items.length === 0) {
-    items.push({
-      id: 'empty-songsang',
-      label: 'Tiada langkah dijumpai untuk disemak',
-      status: 'tiada',
-      tip: 'Masukkan persamaan, nilai k, atau y baharu daripada jalan kerja.',
-    })
+  // bergabung
+  const n2 = problem.jointNumerator2?.toLowerCase()
+  const d = problem.jointDenominator?.toLowerCase()
+  if (n2 && d) {
+    return (
+      s.includes(`${dep}propto${ind}${n2}/${d}`) ||
+      s.includes(`${dep}=k${ind}${n2}/${d}`) ||
+      s.includes(`${dep}propto${ind}*${n2}/${d}`)
+    )
   }
-
-  return items
+  if (d && !n2) {
+    // E ∝ f/g
+    return (
+      s.includes(`${dep}propto${ind}/${d}`) ||
+      s.includes(`${dep}=k${ind}/${d}`) ||
+      s.includes(`${dep}=(k${ind})/${d}`) ||
+      s.includes(`${dep}=k*${ind}/${d}`)
+    )
+  }
+  if (n2 && !d) {
+    return (
+      s.includes(`${dep}propto${ind}${n2}`) ||
+      s.includes(`${dep}=k${ind}${n2}`)
+    )
+  }
+  return false
 }
 
-export function checkJointWorking(input: JointInput): CheckItem[] {
-  const {
-    x,
-    z,
-    y,
-    w = 1,
-    x2,
-    z2,
-    w2,
-    y2Expected,
-    studentK,
-    studentEquation,
-    studentY2,
-  } = input
-  const hasW = w !== 1 || (w2 != null && w2 !== 1)
-  const expectedK = jointConstant(x, z, y, w)
-  const items: CheckItem[] = []
+function equationWithKLooksCorrect(student: string, problem: PaperProblem): boolean {
+  const s = normalizeMath(student)
+  const dep = problem.dependent.toLowerCase()
+  const ind = problem.independent.toLowerCase()
 
-  if (studentEquation != null && studentEquation.trim() !== '') {
-    const ok = matchesJointEquation(studentEquation, hasW)
+  if (problem.kind === 'langsung') {
+    return s.includes(`${dep}=k${ind}`) || s.includes(`${dep}=k*${ind}`)
+  }
+  if (problem.kind === 'songsang') {
+    const power = problem.inversePower ?? 1
+    if (power === 0.5) return s.includes(`${dep}=k/sqrt${ind}`)
+    if (power === 2) return s.includes(`${dep}=k/${ind}^2`) || s.includes(`${dep}=k/${ind}²`)
+    return s.includes(`${dep}=k/${ind}`)
+  }
+  const n2 = problem.jointNumerator2?.toLowerCase()
+  const d = problem.jointDenominator?.toLowerCase()
+  if (d && !n2) {
+    return (
+      s.includes(`${dep}=k${ind}/${d}`) ||
+      s.includes(`${dep}=(k${ind})/${d}`) ||
+      s.includes(`${dep}=kf/${d}`.replace('f', ind))
+    )
+  }
+  if (n2 && d) return s.includes(`${dep}=k${ind}${n2}/${d}`)
+  if (n2) return s.includes(`${dep}=k${ind}${n2}`)
+  return false
+}
+
+/**
+ * Semak jalan kerja bergaya kertas KVSA:
+ * 1) kenyataan ∝  2) persamaan dengan k  3) nilai k  4) jawapan akhir
+ */
+export function checkPaperWorking(
+  problem: PaperProblem,
+  student: StudentPaperWorking,
+): CheckItem[] {
+  const items: CheckItem[] = []
+  const expectedK = computeK(problem)
+  const expectedAns =
+    problem.expectedAnswer ??
+    (expectedK != null ? evaluateAsked(problem, expectedK) : null)
+
+  // 1. Proportion
+  if (student.proportionText || student.hasProportion) {
+    const text = student.proportionText ?? ''
+    const ok = text ? proportionLooksCorrect(text, problem) : Boolean(student.hasProportion)
     items.push({
-      id: 'eq-bergabung',
-      label: 'Bentuk persamaan ubahan bergabung',
+      id: 'step-proportion',
+      label: 'Kenyataan ubahan (∝)',
       status: ok ? 'betul' : 'salah',
-      expected: hasW ? 'y = kxz / w' : 'y = kxz',
-      found: studentEquation.trim(),
+      expected: problem.expectedProportion,
+      found: text || '(ada kenyataan)',
       tip: ok
         ? undefined
-        : hasW
-          ? 'Untuk bergabung dengan songsang terhadap w, tulis y = kxz / w.'
-          : 'Untuk bergabung y ∝ xz, tulis y = kxz.',
+        : `Tulis dulu ${problem.expectedProportion} sebelum bentukkan persamaan.`,
+    })
+  } else {
+    items.push({
+      id: 'step-proportion',
+      label: 'Kenyataan ubahan (∝)',
+      status: 'salah',
+      expected: problem.expectedProportion,
+      found: 'tiada',
+      tip: 'Pada kertas, mula dengan kenyataan ∝ seperti dalam contoh bilik darjah.',
     })
   }
 
-  if (studentK != null && expectedK != null) {
-    const forgotW = hasW && nearlyEqual(studentK, y / (x * z))
-    const ok = nearlyEqual(studentK, expectedK)
+  // 2. Equation with k
+  if (student.equationWithK || student.hasEquationWithK) {
+    const text = student.equationWithK ?? ''
+    const ok = text
+      ? equationWithKLooksCorrect(text, problem)
+      : Boolean(student.hasEquationWithK)
     items.push({
-      id: 'k-bergabung',
-      label: 'Pemalar ubahan, k',
+      id: 'step-equation',
+      label: 'Persamaan dengan pemalar k',
+      status: ok ? 'betul' : 'salah',
+      expected:
+        problem.kind === 'langsung'
+          ? `${problem.dependent} = k${problem.independent}`
+          : problem.kind === 'songsang'
+            ? `${problem.dependent} = k / ${powerLabel(problem.inversePower ?? 1, problem.independent)}`
+            : problem.jointDenominator && !problem.jointNumerator2
+              ? `${problem.dependent} = k${problem.independent}/${problem.jointDenominator}`
+              : `${problem.dependent} = k...`,
+      found: text || '(ada persamaan)',
+      tip: ok ? undefined : 'Tulis persamaan yang mengandungi k selepas kenyataan ∝.',
+    })
+  } else {
+    items.push({
+      id: 'step-equation',
+      label: 'Persamaan dengan pemalar k',
+      status: 'salah',
+      expected: 'persamaan dengan k',
+      found: 'tiada',
+      tip: 'Contoh: y = kx  atau  G = k/√h  atau  E = kf/g.',
+    })
+  }
+
+  // 3. Constant k
+  if (student.k != null && expectedK != null) {
+    const ok = nearlyEqual(student.k, expectedK)
+    items.push({
+      id: 'step-k',
+      label: 'Cari pemalar k',
       status: ok ? 'betul' : 'salah',
       expected: formatNumber(expectedK),
-      found: formatNumber(studentK),
+      found: formatNumber(student.k),
       tip: ok
         ? undefined
-        : forgotW
-          ? 'Anda nampaknya terlupa pemboleh ubah w. Guna k = yw / (xz).'
-          : hasW
-            ? 'Untuk y = kxz / w, k = yw / (xz).'
-            : 'Untuk y = kxz, k = y / (xz).',
+        : 'Ganti nilai diberi ke dalam persamaan untuk dapatkan k.',
+    })
+  } else if (expectedK != null) {
+    items.push({
+      id: 'step-k',
+      label: 'Cari pemalar k',
+      status: 'salah',
+      expected: formatNumber(expectedK),
+      found: 'tiada',
+      tip: 'Pastikan langkah mencari k jelas, contoh: 7 = k(2) ⇒ k = 3.5',
     })
   }
 
-  if (studentY2 != null && x2 != null && z2 != null && expectedK != null) {
-    const ww = w2 ?? w
-    const expected = y2Expected ?? jointY(expectedK, x2, z2, ww)
-    if (expected != null) {
-      const ok = nearlyEqual(studentY2, expected)
+  // 4. Final answer (if problem asks for a value)
+  if (expectedAns != null) {
+    if (student.answer != null) {
+      const ok = nearlyEqual(student.answer, expectedAns)
       items.push({
-        id: 'y2-bergabung',
-        label: 'Nilai baharu y',
+        id: 'step-answer',
+        label: 'Jawapan akhir',
         status: ok ? 'betul' : 'salah',
-        expected: formatNumber(expected),
-        found: formatNumber(studentY2),
+        expected: formatNumber(expectedAns),
+        found: formatNumber(student.answer),
         tip: ok
           ? undefined
-          : 'Ganti semua nilai baharu ke dalam persamaan selepas k dijumpai.',
+          : 'Selepas dapat k, ganti nilai baharu ke dalam persamaan untuk jawapan akhir.',
+      })
+    } else {
+      items.push({
+        id: 'step-answer',
+        label: 'Jawapan akhir',
+        status: 'salah',
+        expected: formatNumber(expectedAns),
+        found: 'tiada',
+        tip: 'Tandakan jawapan akhir (boleh guna # seperti dalam kelas).',
+      })
+    }
+  } else if (student.finalEquation || student.answer == null) {
+    // Relationship-only question (like express G in terms of h)
+    if (student.finalEquation && expectedK != null) {
+      const s = normalizeMath(student.finalEquation)
+      const dep = problem.dependent.toLowerCase()
+      const ind = problem.independent.toLowerCase()
+      const kStr = normalizeMath(formatNumber(expectedK))
+      let ok = false
+      if (problem.kind === 'songsang' && (problem.inversePower ?? 1) === 0.5) {
+        ok = s.includes(`${dep}=${kStr}/sqrt${ind}`) || s.includes(`${dep}=${kStr}/√${ind}`)
+      } else if (problem.kind === 'langsung') {
+        ok = s.includes(`${dep}=${kStr}${ind}`)
+      } else if (problem.kind === 'songsang') {
+        ok = s.includes(`${dep}=${kStr}/${ind}`)
+      } else if (problem.jointDenominator && !problem.jointNumerator2) {
+        ok =
+          s.includes(`${dep}=${kStr}${problem.independent.toLowerCase()}/${problem.jointDenominator.toLowerCase()}`) ||
+          s.includes(`${dep}=(${kStr}${problem.independent.toLowerCase()})/${problem.jointDenominator.toLowerCase()}`)
+      }
+      items.push({
+        id: 'step-final-eq',
+        label: 'Hubungan akhir (dengan nilai k)',
+        status: ok ? 'betul' : 'salah',
+        expected: `persamaan dengan k = ${formatNumber(expectedK)}`,
+        found: student.finalEquation,
+        tip: ok ? undefined : 'Tulis semula persamaan selepas nilai k dijumpai.',
       })
     }
   }
 
   if (items.length === 0) {
     items.push({
-      id: 'empty-bergabung',
-      label: 'Tiada langkah dijumpai untuk disemak',
+      id: 'empty',
+      label: 'Tiada langkah dijumpai',
       status: 'tiada',
-      tip: 'Masukkan persamaan, nilai k, atau y baharu daripada jalan kerja.',
+      tip: 'Imbas atau taip jalan kerja mengikut langkah: ∝ → persamaan k → cari k → jawapan.',
     })
   }
 
@@ -370,4 +424,21 @@ export function summarizeChecks(items: CheckItem[]): {
     else verdict = 'Ada langkah betul, ada yang perlu dibaiki'
   }
   return { score, total, verdict }
+}
+
+/** Kekalkan helper lama untuk ujian ringkas / serasi. */
+export function directConstant(x: number, y: number): number | null {
+  if (x === 0) return null
+  return y / x
+}
+
+export function inverseConstant(x: number, y: number, power: InversePower = 1): number | null {
+  const base = power === 0.5 ? Math.sqrt(x) : power === 2 ? x * x : x
+  if (base === 0) return null
+  return y * base
+}
+
+export function jointConstantFg(f: number, g: number, e: number): number | null {
+  if (f === 0) return null
+  return (e * g) / f
 }

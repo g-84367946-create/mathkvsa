@@ -1,73 +1,65 @@
 import { describe, expect, it } from 'vitest'
-import {
-  checkDirectWorking,
-  checkInverseWorking,
-  checkJointWorking,
-  directConstant,
-  inverseConstant,
-  jointConstant,
-  summarizeChecks,
-} from './variation'
 import { parseWorkingText } from './parseWorking'
+import {
+  checkPaperWorking,
+  computeK,
+  evaluateAsked,
+  summarizeChecks,
+  type PaperProblem,
+} from './variation'
+import { PRACTICE_EXAMPLES } from './examples'
 
-describe('variation math', () => {
-  it('computes constants for each type', () => {
-    expect(directConstant(4, 20)).toBe(5)
-    expect(inverseConstant(4, 6)).toBe(24)
-    expect(jointConstant(2, 3, 30, 1)).toBe(5)
-    expect(jointConstant(2, 3, 10, 4)).toBe(20 / 3)
+describe('worksheet-style variation', () => {
+  it('solves direct baju kurung problem', () => {
+    const problem = PRACTICE_EXAMPLES[0]!.problem
+    expect(computeK(problem)).toBe(3.5)
+    expect(evaluateAsked(problem, 3.5)).toBe(32)
   })
 
-  it('flags inverse k used on direct variation', () => {
-    const checks = checkDirectWorking({
-      x: 4,
-      y: 20,
-      studentK: 80,
-      studentEquation: 'y = k/x',
-    })
-    expect(checks.find((c) => c.id === 'k-langsung')?.status).toBe('salah')
-    expect(checks.find((c) => c.id === 'eq-langsung')?.status).toBe('salah')
+  it('solves inverse with square root', () => {
+    const problem = PRACTICE_EXAMPLES[1]!.problem
+    expect(computeK(problem)).toBe(24)
   })
 
-  it('accepts correct inverse working', () => {
-    const checks = checkInverseWorking({
-      x: 4,
-      y: 6,
-      x2: 8,
-      studentK: 24,
-      studentEquation: 'y = k/x',
-      studentY2: 3,
-    })
-    const summary = summarizeChecks(checks)
-    expect(summary.score).toBe(summary.total)
+  it('solves joint E ∝ f/g', () => {
+    const problem = PRACTICE_EXAMPLES[2]!.problem
+    expect(computeK(problem)).toBe(3)
+    expect(evaluateAsked(problem, 3)).toBe(5)
   })
 
-  it('accepts joint variation with divisor', () => {
-    const checks = checkJointWorking({
-      x: 2,
-      z: 3,
-      y: 12,
-      w: 2,
-      x2: 4,
-      z2: 3,
-      w2: 2,
-      studentK: 4,
-      studentEquation: 'y = kxz / w',
-      studentY2: 24,
-    })
+  it('marks correct paper working for direct', () => {
+    const ex = PRACTICE_EXAMPLES[0]!
+    const parsed = parseWorkingText(ex.sampleWorking)
+    const checks = checkPaperWorking(ex.problem, parsed)
     expect(summarizeChecks(checks).verdict).toBe('Jalan kerja nampak betul')
+  })
+
+  it('marks wrong power on inverse', () => {
+    const ex = PRACTICE_EXAMPLES[1]!
+    const parsed = parseWorkingText(ex.commonMistake)
+    const checks = checkPaperWorking(ex.problem, parsed)
+    expect(checks.find((c) => c.id === 'step-proportion')?.status).toBe('salah')
+    expect(checks.find((c) => c.id === 'step-k')?.status).toBe('salah')
+  })
+
+  it('parses joint working steps from paper', () => {
+    const parsed = parseWorkingText(PRACTICE_EXAMPLES[2]!.sampleWorking)
+    expect(parsed.proportionText?.toLowerCase()).toContain('f/g')
+    expect(parsed.k).toBe(3)
+    expect(parsed.answer).toBe(5)
   })
 })
 
-describe('parseWorkingText', () => {
-  it('parses Malay variation working', () => {
-    const parsed = parseWorkingText(`
-      y = kx
-      k = 5
-      y = 25
-    `)
-    expect(parsed.equation?.toLowerCase()).toContain('y')
-    expect(parsed.k).toBe(5)
-    expect(parsed.y2).toBe(25)
+describe('computeK edge', () => {
+  it('handles plain inverse', () => {
+    const problem: PaperProblem = {
+      kind: 'songsang',
+      dependent: 'y',
+      independent: 'x',
+      inversePower: 1,
+      given: { y: 6, x: 4 },
+      expectedProportion: 'y ∝ 1/x',
+    }
+    expect(computeK(problem)).toBe(24)
   })
 })

@@ -1,19 +1,24 @@
-# MathKVSA — Scanner Ubahan
+# MathKVSA — Scanner Ubahan (jalan kerja kertas)
 
-Aplikasi web untuk **semakan jalan kerja matematik** pelajar bagi tajuk **ubahan**:
+Aplikasi untuk **semak jalan kerja ubahan** yang pelajar tulis di atas kertas, gaya bilik darjah KVSA:
 
-- **Ubahan langsung** — \(y \propto x\), \(y = kx\)
-- **Ubahan songsang** — \(y \propto 1/x\), \(y = k/x\)
-- **Ubahan bergabung** — \(y \propto xz\) atau \(y \propto xz/w\)
+1. Kenyataan ubahan (`∝`)
+2. Persamaan dengan pemalar `k`
+3. Ganti nilai diberi → cari `k`
+4. Persamaan akhir / jawapan
 
-## Ciri
+## Jenis soalan
 
-- Imbas / muat naik gambar jalan kerja (OCR) atau taip manual
-- Semak bentuk persamaan, pemalar **k**, dan nilai **y** baharu
-- Tip untuk kesilapan biasa (contoh: guna formula songsang untuk langsung)
-- Contoh soalan siap cuba
+- **Ubahan langsung** — contoh: baju kurung & masa (`y ∝ x`)
+- **Ubahan songsang** — termasuk punca kuasa dua (`G ∝ 1/√h`)
+- **Ubahan bergabung** — contoh (`E ∝ f/g`)
 
-## Jalankan
+## Cara guna
+
+1. Pilih jenis ubahan / contoh Sprint
+2. Pelajar tulis jalan kerja di kertas
+3. Imbas satu soalan setiap kali (kamera / galeri)
+4. Betulkan teks OCR jika perlu, kemudian semak langkah
 
 ```bash
 npm install
@@ -23,13 +28,4 @@ npm run dev
 ```bash
 npm test
 npm run build
-```
-
-## Format jalan kerja yang mesra OCR
-
-```text
-y = kx
-k = 5
-bila x = 7
-jadi y = 35
 ```

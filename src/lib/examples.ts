@@ -1,103 +1,103 @@
-import type { VariationKind } from './variation'
+import type { PaperProblem, VariationKind } from './variation'
 
 export type PracticeExample = {
   id: string
   title: string
   topic: VariationKind
   prompt: string
-  x: number
-  y: number
-  z?: number
-  w?: number
-  x2?: number
-  y2?: number
-  z2?: number
-  w2?: number
+  problem: PaperProblem
   sampleWorking: string
   commonMistake: string
 }
 
+/** Contoh sejajar format kertas KVSA (Sprint / jalan kerja tangan). */
 export const PRACTICE_EXAMPLES: PracticeExample[] = [
   {
-    id: 'langsung-1',
-    title: 'Ubahan langsung — cari k dan y',
+    id: 'sprint-langsung-baju',
+    title: 'Ubahan langsung — baju kurung & masa',
     topic: 'langsung',
-    prompt: 'Diberi y berubah secara langsung dengan x. Jika x = 4 apabila y = 20, cari y bila x = 7.',
-    x: 4,
-    y: 20,
-    x2: 7,
-    y2: 35,
-    sampleWorking: `y = kx
-k = 20 / 4 = 5
-y = 5x
-bila x = 7
-jadi y = 35`,
-    commonMistake: `y = k/x
-k = 20 × 4 = 80
-y = 80 / 7
-jadi y = 11.43`,
+    prompt:
+      'Seorang tukang jahit dapat menyiapkan 7 pasang baju kurung dalam masa 2 hari. Bilangan baju kurung berubah secara langsung dengan masa. Hitung masa untuk 112 pasang baju kurung.',
+    problem: {
+      kind: 'langsung',
+      dependent: 'y',
+      independent: 'x',
+      given: { y: 7, x: 2 },
+      ask: { y: 112 },
+      findVar: 'x',
+      expectedAnswer: 32,
+      expectedProportion: 'y ∝ x',
+    },
+    sampleWorking: `y ∝ x
+y = kx
+7 = k(2)
+k = 3.5
+y = 3.5x
+112 = 3.5x
+x = 32`,
+    commonMistake: `y ∝ x
+y = kx
+7 = k(2)
+k = 3.5
+y = 3.5x
+x = 3.5(112)
+x = 392`,
   },
   {
-    id: 'songsang-1',
-    title: 'Ubahan songsang — cari k dan y',
+    id: 'sprint-songsang-sqrt',
+    title: 'Ubahan songsang — G ∝ 1/√h',
     topic: 'songsang',
-    prompt: 'Diberi y berubah secara songsang dengan x. Jika x = 4 apabila y = 6, cari y bila x = 8.',
-    x: 4,
-    y: 6,
-    x2: 8,
-    y2: 3,
-    sampleWorking: `y = k/x
-k = 4 × 6 = 24
-y = 24/x
-bila x = 8
-jadi y = 3`,
-    commonMistake: `y = kx
-k = 6 / 4 = 1.5
-y = 1.5 × 8
-jadi y = 12`,
+    prompt:
+      'Jadual: G = 6,4 dan h = 16,36. Diberi G berubah secara songsang dengan punca kuasa dua h. Ungkapkan hubungan antara G dan h.',
+    problem: {
+      kind: 'songsang',
+      dependent: 'G',
+      independent: 'h',
+      inversePower: 0.5,
+      given: { G: 6, h: 16 },
+      expectedProportion: 'G ∝ 1/√h',
+    },
+    sampleWorking: `G ∝ 1/√h
+G = k/√h
+6 = k/√16
+k = 24
+G = 24/√h`,
+    commonMistake: `G ∝ 1/h
+G = k/h
+6 = k/16
+k = 96
+G = 96/h`,
   },
   {
-    id: 'bergabung-1',
-    title: 'Ubahan bergabung — y ∝ xz',
+    id: 'sprint-bergabung-efg',
+    title: 'Ubahan bergabung — E ∝ f/g',
     topic: 'bergabung',
     prompt:
-      'Diberi y berubah secara bergabung dengan x dan z. Jika x = 2, z = 3 dan y = 30, cari y bila x = 4 dan z = 5.',
-    x: 2,
-    y: 30,
-    z: 3,
-    x2: 4,
-    z2: 5,
-    y2: 100,
-    sampleWorking: `y = kxz
-k = 30 / (2 × 3) = 5
-y = 5xz
-bila x = 4, z = 5
-jadi y = 100`,
-    commonMistake: `y = kx
-k = 30 / 2 = 15
-jadi y = 15 × 4 = 60`,
-  },
-  {
-    id: 'bergabung-2',
-    title: 'Ubahan bergabung — y ∝ xz / w',
-    topic: 'bergabung',
-    prompt:
-      'Diberi y ∝ xz / w. Jika x = 2, z = 3, w = 2 dan y = 12, cari y bila x = 4, z = 3, w = 2.',
-    x: 2,
-    y: 12,
-    z: 3,
-    w: 2,
-    x2: 4,
-    z2: 3,
-    w2: 2,
-    y2: 24,
-    sampleWorking: `y = kxz / w
-k = (12 × 2) / (2 × 3) = 4
-y = 4xz / w
-bila x = 4, z = 3, w = 2
-jadi y = 24`,
-    commonMistake: `y = kxz / w
-k = 12 / (2 × 3) = 2
-jadi y = 2 × 4 × 3 / 2 = 12`,
+      'Diberi E ∝ f/g. Jika E = 4 apabila f = 8 dan g = 6, hitung E apabila f = 5 dan g = 3.',
+    problem: {
+      kind: 'bergabung',
+      dependent: 'E',
+      independent: 'f',
+      jointDenominator: 'g',
+      given: { E: 4, f: 8, g: 6 },
+      ask: { f: 5, g: 3 },
+      findVar: 'E',
+      expectedAnswer: 5,
+      expectedProportion: 'E ∝ f/g',
+    },
+    sampleWorking: `E ∝ f/g
+E = kf/g
+4 = k(8)/6
+k = 3
+E = 3f/g
+E = 3(5)/3
+E = 5`,
+    commonMistake: `E ∝ f/g
+E = kf/g
+4 = k(8)/6
+k = 3
+E = 3f/g
+E = 3(5)/6
+E = 2.5`,
   },
 ]

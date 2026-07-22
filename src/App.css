@@ -482,6 +482,44 @@
   margin-bottom: 0.25rem;
 }
 
+.prompt-box {
+  margin-bottom: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 14px;
+  background: rgba(15, 61, 62, 0.06);
+  border: 1px solid var(--line);
+}
+
+.prompt-box strong {
+  display: block;
+  color: var(--teal);
+  font-family: var(--font-display);
+  margin-bottom: 0.35rem;
+}
+
+.prompt-box p {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.step-guide {
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid var(--line);
+}
+
+.step-guide strong {
+  color: var(--teal);
+}
+
+.step-guide ol {
+  margin: 0.45rem 0 0;
+  padding-left: 1.2rem;
+  color: var(--ink-soft);
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
